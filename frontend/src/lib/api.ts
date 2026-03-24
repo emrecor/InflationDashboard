@@ -13,13 +13,16 @@ export const fetchCategories = async (): Promise<string[]> => {
 };
 
 export const fetchInflationData = async (category: string, timeRange: string) => {
-    try {
-        const response = await axios.get(`${API_BASE_URL}/inflation-data`, {
-            params: { category, time_range: timeRange }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching inflation data", error);
-        return { chartData: [], tableData: [] };
-    }
+  try {
+    const response = await axios.get(`${API_BASE_URL}/inflation-data`, {
+      params: { 
+        category, 
+        time_range: timeRange
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching inflation data for ${category} with range ${timeRange}:`, error);
+    return { chartData: [], tableData: [] };
+  }
 };
