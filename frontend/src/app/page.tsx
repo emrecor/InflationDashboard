@@ -10,7 +10,7 @@ import SummaryTable from '@/components/SummaryTable';
 export default function Dashboard() {
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('6m');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('all');
   
   const [chartData, setChartData] = useState([]);
   const [tableData, setTableData] = useState([]);
