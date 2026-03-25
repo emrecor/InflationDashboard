@@ -34,7 +34,15 @@ CUSTOM_CATEGORIES = {
         "includes": ["Ayçiçek", " 5 L"]
     },
     "Yumurta (30'lu)": {
+        "base_category": "Yumurta",
         "includes": ["30'lu", "Yumurta"]
+    },
+    "Tavuk Bonfile (1 KG)": {
+        "base_category": "Tavuk Eti",
+        "includes": ["Kg"],
+        "any_includes": ["Bonfile", "Göğüs"],
+        "exclusions": ["Çıtır", "Soslu", "Organik", "Köylüm", "Şiş", "Baby", "Kuşbaşı"],
+        "price_expression": "price"
     },
     "Dana Kıyma (1 KG)": {
         "base_category": "Dana Eti",
@@ -48,13 +56,13 @@ CUSTOM_CATEGORIES = {
     },
     "Bebek Bezi (4 No / Maxi)": {
         "base_category": "Bebek Bezi",
-        "includes": ["4 Beden", "4 No", "Maxi"],
+        "any_includes": ["4 Beden", "4 No", "Maxi"],
         "exclusions": ["4+"],
         "price_expression": "price / NULLIF(CAST(SUBSTRING(product_name FROM '([0-9]+)\\s*(?:Adet|Ad\\.|''l[ıiüu])') AS NUMERIC), 0)"
     },
     "Süt (1 L)": {
         "base_category": "Süt",
-        "includes": ["1 L", "1L", "1 Lt", "1000 Ml"],
+        "any_includes": ["1 L", "1L", "1 Lt", "1000 Ml"],
         "exclusions": [
             "x", "X", "organik", "probiyotik", "Badem", "Yulaf", "Hindistan Cevizi", 
             "Fındık", "Bitkisel", "İçecek", "İçeceği", "Kakaolu", "Çikolata", 
@@ -134,6 +142,7 @@ def get_inflation_data(
         base_cat = custom_def.get("base_category")
         exclusions = custom_def.get("exclusions", [])
         includes = custom_def.get("includes", [])
+        any_includes = custom_def.get("any_includes", [])
         price_expr = custom_def.get("price_expression", "price")
         
         where_clause = f"WHERE date >= CURRENT_DATE - INTERVAL '{interval_clause}'"
@@ -143,10 +152,14 @@ def get_inflation_data(
             where_clause += " AND category = %s"
             params.append(base_cat)
         
-        if includes:
-            include_clauses = " OR ".join(["LOWER(product_name) LIKE %s" for _ in includes])
+        for inc in includes:
+            where_clause += " AND LOWER(product_name) LIKE %s"
+            params.append(f"%{inc.lower()}%")
+            
+        if any_includes:
+            include_clauses = " OR ".join(["LOWER(product_name) LIKE %s" for _ in any_includes])
             where_clause += f" AND ({include_clauses})"
-            for inc in includes:
+            for inc in any_includes:
                 params.append(f"%{inc.lower()}%")
             
         for excl in exclusions:

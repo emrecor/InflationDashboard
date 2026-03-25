@@ -13,7 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className="antialiased bg-zinc-950 text-zinc-50">
+      <body className="antialiased bg-zinc-950 text-zinc-50" suppressHydrationWarning>
         {children}
       </body>
     </html>
