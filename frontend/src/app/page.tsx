@@ -15,6 +15,12 @@ export default function Dashboard() {
   const [chartData, setChartData] = useState([]);
   const [tableData, setTableData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Handle hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Initial load: Fetch categories
   useEffect(() => {
@@ -44,6 +50,8 @@ export default function Dashboard() {
     
     loadData();
   }, [selectedCategory, selectedTimeRange]);
+
+  if (!isMounted) return null;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
