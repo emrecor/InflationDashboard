@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
+    <html lang="tr" suppressHydrationWarning>
       <body className="antialiased bg-zinc-950 text-zinc-50">
         {children}
       </body>

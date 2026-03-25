@@ -16,14 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Kategori bazlı hariç tutulacak kelimeler
-CATEGORY_EXCLUSIONS = {
-    "Yumurta": ["sürpriz", "çikolata", "şeker", "organizer"],
-}
 
-# Özel tanımlanmış sanal kategoriler
+
 CUSTOM_CATEGORIES = {
-    "1 Pirinc(1 kilo)": {
+    "Pirinç (1 KG)": {
         "base_category": "Bakliyat",
         "exclusions": [
             "tohum", "chia", "kinoa", "amarant", "karabuğday", "greçka",
@@ -31,6 +27,40 @@ CUSTOM_CATEGORIES = {
             "fit", "sebzeli", "domatesli", "biberli", "karışık", "patlayan", "cin mısır",
             "mikrodalga", "maş", "beluga", "iç bakla", "börülce", "bulgur", "fasulye",
             "mercimek", "buğday", "bombay", "nohut", "barbunya", "organik", "bio"
+        ]
+    },
+    "Ayçiçek Yağı (5L)": {
+        "base_category": "Ayçiçek Yağı",
+        "includes": ["Ayçiçek", " 5 L"]
+    },
+    "Yumurta (30'lu)": {
+        "includes": ["30'lu", "Yumurta"]
+    },
+    "Dana Kıyma (1 KG)": {
+        "base_category": "Dana Eti",
+        "includes": ["kıyma", "Kg"],
+        "exclusions": ["Köfte", "Döner", "Piliç", "dondurulmuş"]
+    },
+    "Dana Kuşbaşı (400 G)": {
+        "base_category": "Dana Eti",
+        "includes": ["Kuşbaşı", " 400 "],
+        "exclusions": ["Piliç"]
+    },
+    "Bebek Bezi (4 No / Maxi)": {
+        "base_category": "Bebek Bezi",
+        "includes": ["4 Beden", "4 No", "Maxi"],
+        "exclusions": ["4+"],
+        "price_expression": "price / NULLIF(CAST(SUBSTRING(product_name FROM '([0-9]+)\\s*(?:Adet|Ad\\.|''l[ıiüu])') AS NUMERIC), 0)"
+    },
+    "Süt (1 L)": {
+        "base_category": "Süt",
+        "includes": ["1 L", "1L", "1 Lt", "1000 Ml"],
+        "exclusions": [
+            "x", "X", "organik", "probiyotik", "Badem", "Yulaf", "Hindistan Cevizi", 
+            "Fındık", "Bitkisel", "İçecek", "İçeceği", "Kakaolu", "Çikolata", 
+            "Muzlu", "Çilekli", "Karamel", "Vanilya", "Latte", "Mocha", 
+            "Macchiato", "Milkshake", "Salep", "Dondurma", "Çocuk", "Devam", 
+            "Kido", "Milkino", "Miniki", "İçimino", "Protein", "Keçi"
         ]
     }
 }
@@ -48,7 +78,15 @@ def get_categories():
         cursor = conn.cursor()
         cursor.execute("SELECT DISTINCT category FROM prices WHERE category IS NOT NULL ORDER BY category")
         results = cursor.fetchall()
-        categories = [row[0] for row in results]
+        
+        # Orijinal kategoriler
+        all_categories = [row[0] for row in results]
+        
+        # Gizlenecek (Base) kategorileri topla (CUSTOM_CATEGORIES içinde base_category olarak tanımlananlar)
+        base_categories = {v.get("base_category") for v in CUSTOM_CATEGORIES.values() if v.get("base_category")}
+        
+        # Filtrele: Base olmayanları koru
+        categories = [cat for cat in all_categories if cat not in base_categories]
         
         # Özel kategorileri ekle
         for custom_cat in CUSTOM_CATEGORIES.keys():
@@ -93,30 +131,38 @@ def get_inflation_data(
     
     if safe_category in CUSTOM_CATEGORIES:
         custom_def = CUSTOM_CATEGORIES[safe_category]
-        base_cat = custom_def["base_category"]
-        exclusions = custom_def["exclusions"]
+        base_cat = custom_def.get("base_category")
+        exclusions = custom_def.get("exclusions", [])
+        includes = custom_def.get("includes", [])
+        price_expr = custom_def.get("price_expression", "price")
         
-        where_clause = f"WHERE category = %s AND date >= CURRENT_DATE - INTERVAL '{interval_clause}'"
-        params = [base_cat]
+        where_clause = f"WHERE date >= CURRENT_DATE - INTERVAL '{interval_clause}'"
+        params = []
         
+        if base_cat:
+            where_clause += " AND category = %s"
+            params.append(base_cat)
+        
+        if includes:
+            include_clauses = " OR ".join(["LOWER(product_name) LIKE %s" for _ in includes])
+            where_clause += f" AND ({include_clauses})"
+            for inc in includes:
+                params.append(f"%{inc.lower()}%")
+            
         for excl in exclusions:
             where_clause += " AND LOWER(product_name) NOT LIKE %s"
-            params.append(f"%{excl}%")
+            params.append(f"%{excl.lower()}%")
     else:
         where_clause = f"WHERE category = %s AND date >= CURRENT_DATE - INTERVAL '{interval_clause}'"
         params = [category]
-        
-        if safe_category in CATEGORY_EXCLUSIONS:
-            for word in CATEGORY_EXCLUSIONS.get(safe_category, []):
-                where_clause += " AND LOWER(product_name) NOT LIKE %s"
-                params.append(f"%{word}%")
+        price_expr = "price"
 
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         # 1. Günlük Veriler (Grafik İçin)
         cursor.execute(f"""
-            SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str, AVG(price) as avg_price
+            SELECT TO_CHAR(date, 'YYYY-MM-DD') as date_str, AVG({price_expr}) as avg_price
             FROM prices {where_clause}
             GROUP BY TO_CHAR(date, 'YYYY-MM-DD')
             ORDER BY date_str ASC
@@ -125,7 +171,8 @@ def get_inflation_data(
 
         # 2. Aylık Veriler (Tablo İçin)
         cursor.execute(f"""
-            SELECT TO_CHAR(date, 'YYYY-MM') as month_str, AVG(price) as avg_price
+            SELECT TO_CHAR(date, 'YYYY-MM') as month_str, 
+                   AVG({price_expr}) as avg_price
             FROM prices {where_clause}
             GROUP BY TO_CHAR(date, 'YYYY-MM')
             ORDER BY month_str ASC

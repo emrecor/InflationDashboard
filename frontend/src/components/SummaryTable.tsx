@@ -33,7 +33,7 @@ export default function SummaryTable({ data }: SummaryTableProps) {
                   {row.month}
                 </td>
                 <td className="px-5 py-4 text-right tabular-nums text-indigo-100">
-                  ₺{row.avgPrice.toFixed(2)}
+                  ₺{row.avgPrice ? row.avgPrice.toFixed(2) : '-'}
                 </td>
                 <td className="px-5 py-4 text-right">
                   <div className="flex items-center justify-end gap-1.5">
