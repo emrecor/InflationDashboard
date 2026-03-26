@@ -23,6 +23,18 @@ export const fetchInflationData = async (category: string, timeRange: string) =>
     return response.data;
   } catch (error) {
     console.error(`Error fetching inflation data for ${category} with range ${timeRange}:`, error);
-    return { chartData: [], tableData: [] };
+    return { chartData: [], tableData: [], stats: null };
+  }
+};
+
+export const fetchComparison = async (category: string) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/comparison`, {
+      params: { category }
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching comparison for ${category}:`, error);
+    return [];
   }
 };

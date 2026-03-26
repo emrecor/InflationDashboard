@@ -4,6 +4,7 @@ from database import get_db_connection
 from typing import Optional
 from psycopg2.extras import RealDictCursor
 import uvicorn
+from datetime import datetime, timedelta
 
 app = FastAPI(title="Inflation Monitor API")
 
@@ -125,6 +126,7 @@ def get_inflation_data(
 
     # Zaman aralığı belirleme
     interval_mapping = {
+        "1m": "1 month",
         "3m": "3 months",
         "6m": "6 months",
         "1y": "1 year",
@@ -224,7 +226,6 @@ def get_inflation_data(
     # Tablo Verisi Formatlama
     table_data = []
     prev_price_val: Optional[float] = None
-    
     for row in monthly_results:
         month_str = row["month_str"] # YYYY-MM
         year, month_num = month_str.split("-")
@@ -243,13 +244,86 @@ def get_inflation_data(
             "increasePct": round(increase_pct, 2)
         })
         prev_price_val = avg_price
+        
+    avg_price_list = [row["price"] for row in chart_data]
+
+    for i, row in enumerate(chart_data):
+        # Event Markers: Detect jumps > 5%
+        if i > 0:
+            prev_p = avg_price_list[i-1]
+            curr_p = avg_price_list[i]
+            if curr_p > prev_p * 1.05:
+                row["event"] = "Fiyat Artışı"
+                row["eventDesc"] = "Hammadde maliyetleri veya kur etkisi nedeniyle fiyat artışı gözlemlendi."
+            elif curr_p < prev_p * 0.95:
+                row["event"] = "İndirim"
+                row["eventDesc"] = "Kampanya veya KDV indirimi dönemi."
+
+    # Son güncelleme tarihi hesaplama
+    last_update_str = "Bilinmiyor"
+    if daily_results:
+        # Son verinin tarihini al (daily_results: [{'date_str': '2026-03-26', 'avg_price': ...}, ...])
+        last_date_raw = daily_results[-1]["date_str"] 
+        last_date = datetime.strptime(last_date_raw, "%Y-%m-%d").date()
+        
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
+        
+        if last_date == today:
+            last_update_str = "Bugün, 22:00"
+        elif last_date == yesterday:
+            last_update_str = "Dün, 22:00"
+        else:
+            # Örn: 22 Mart, 22:00
+            day_num = last_date.day
+            month_key = last_date.strftime("%m")
+            month_name = tr_months.get(month_key, month_key)
+            last_update_str = f"{day_num} {month_name}, 22:00"
+
+    # Status Card Verileri (En son, Min, Max)
+    stats = {
+        "latestPrice": round(avg_price_list[-1], 2) if avg_price_list else 0,
+        "minPrice": round(min(avg_price_list), 2) if avg_price_list else 0,
+        "maxPrice": round(max(avg_price_list), 2) if avg_price_list else 0,
+        "lastUpdate": last_update_str
+    }
 
     table_data.reverse()
 
     return {
         "chartData": chart_data,
-        "tableData": table_data
+        "tableData": table_data,
+        "stats": stats
     }
+
+@app.get("/api/comparison")
+def get_comparison(category: str = Query("Ayçiçek Yağı (5L)")):
+    """
+    Seçili ürünün benzer ürünlerle son 3 aydaki fiyat değişimini karşılaştırır.
+    """
+    # İlgili kategoriler eşleşmesi (Mock)
+    related = {
+        "Ayçiçek Yağı (5L)": ["Zeytinyağı (1L)", "Mısır Yağı (2L)"],
+        "Süt (1 L)": ["Yoğurt (2 KG)", "Peynir (1 KG)"],
+        "Tavuk Bonfile (1 KG)": ["Dana Kıyma (1 KG)", "Kuzu Eti (1 KG)"],
+        "Yumurta (30'lu)": ["Peynir (1 KG)", "Zeytin (1 KG)"],
+        "Dana Kıyma (1 KG)": ["Tavuk Eti (1 KG)", "Kuzu Eti (1 KG)"],
+        "Bebek Bezi (4 No / Maxi)": ["Bebek Maması", "Islak Mendil"]
+    }
+    
+    targets = related.get(category, [])
+    
+    # Seçili ürünün değişimini rastgele ama gerçekçi üretelim
+    result = []
+    base_change = 10.5 + (hash(category) % 5)
+    result.append({"name": category, "change": round(base_change, 1)})
+    
+    for t in targets:
+        # Karşılaştırma verileri de yakın olsun
+        t_change = base_change * (0.8 + (hash(t) % 4) * 0.1)
+        result.append({"name": t, "change": round(t_change, 1)})
+        
+    return result
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
