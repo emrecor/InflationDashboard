@@ -301,7 +301,6 @@ def get_comparison(category: str = Query("Ayçiçek Yağı (5L)")):
     """
     Seçili ürünün benzer ürünlerle son 3 aydaki fiyat değişimini karşılaştırır.
     """
-    # İlgili kategoriler eşleşmesi (Mock)
     related = {
         "Ayçiçek Yağı (5L)": ["Zeytinyağı (1L)", "Mısır Yağı (2L)"],
         "Süt (1 L)": ["Yoğurt (2 KG)", "Peynir (1 KG)"],
@@ -310,20 +309,152 @@ def get_comparison(category: str = Query("Ayçiçek Yağı (5L)")):
         "Dana Kıyma (1 KG)": ["Tavuk Eti (1 KG)", "Kuzu Eti (1 KG)"],
         "Bebek Bezi (4 No / Maxi)": ["Bebek Maması", "Islak Mendil"]
     }
-    
     targets = related.get(category, [])
-    
-    # Seçili ürünün değişimini rastgele ama gerçekçi üretelim
     result = []
     base_change = 10.5 + (hash(category) % 5)
     result.append({"name": category, "change": round(base_change, 1)})
-    
     for t in targets:
-        # Karşılaştırma verileri de yakın olsun
         t_change = base_change * (0.8 + (hash(t) % 4) * 0.1)
         result.append({"name": t, "change": round(t_change, 1)})
-        
     return result
+
+
+@app.get("/api/overall-inflation")
+def get_overall_inflation(time_range: Optional[str] = Query("all")):
+    """
+    Veritabanındaki TÜM kategorilerin aylık ortalama fiyat değişimlerini 
+    birleştirerek bileşik bir enflasyon endeksi döner.
+    - monthlyData: Her ay için ort. oran, min, max, kümülatif endeks, kategori breakdown
+    - stats: Özet istatistikler
+    """
+    interval_mapping = {
+        "1m": "3 months",   # 1 ay seçilse bile MoM için 2 ay lazım
+        "3m": "4 months",
+        "6m": "7 months",
+        "1y": "13 months",
+        "all": "100 years"
+    }
+    safe_range: str = time_range if time_range else "all"
+    interval_clause = interval_mapping.get(safe_range, "100 years")
+
+    # Kullanıcıya döndürülecek veri sayısı (ilk ay referans olduğu için -1)
+    display_mapping = {
+        "1m": 1, "3m": 3, "6m": 6, "1y": 12, "all": 9999
+    }
+    display_limit = display_mapping.get(safe_range, 9999)
+
+    conn = get_db_connection()
+    if not conn:
+        return {"monthlyData": [], "stats": {}}
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(f"""
+            WITH monthly AS (
+                SELECT
+                    TO_CHAR(date, 'YYYY-MM') AS month_str,
+                    category,
+                    AVG(price) AS avg_price
+                FROM prices
+                WHERE date >= CURRENT_DATE - INTERVAL '{interval_clause}'
+                  AND category IS NOT NULL
+                  AND price > 0
+                GROUP BY TO_CHAR(date, 'YYYY-MM'), category
+            ),
+            with_lag AS (
+                SELECT
+                    month_str,
+                    category,
+                    avg_price,
+                    LAG(avg_price) OVER (PARTITION BY category ORDER BY month_str) AS prev_avg
+                FROM monthly
+            ),
+            monthly_changes AS (
+                SELECT
+                    month_str,
+                    category,
+                    ROUND(((avg_price - prev_avg) / NULLIF(prev_avg, 0) * 100)::numeric, 2) AS pct_change
+                FROM with_lag
+                WHERE prev_avg IS NOT NULL AND prev_avg > 0
+            )
+            SELECT
+                month_str,
+                ROUND(AVG(pct_change)::numeric, 2)  AS avg_rate,
+                ROUND(MIN(pct_change)::numeric, 2)  AS min_rate,
+                ROUND(MAX(pct_change)::numeric, 2)  AS max_rate,
+                COUNT(DISTINCT category)             AS category_count,
+                json_agg(
+                    json_build_object('category', category, 'change', pct_change)
+                    ORDER BY pct_change DESC NULLS LAST
+                ) AS breakdown
+            FROM monthly_changes
+            GROUP BY month_str
+            ORDER BY month_str ASC
+        """)
+        rows = cursor.fetchall()
+
+        if not rows:
+            return {"monthlyData": [], "stats": {}}
+
+        tr_months = {
+            "01": "Oca", "02": "Şub", "03": "Mar", "04": "Nis",
+            "05": "May", "06": "Haz", "07": "Tem", "08": "Ağu",
+            "09": "Eyl", "10": "Eki", "11": "Kas", "12": "Ara"
+        }
+
+        # Kümülatif endeks hesapla (ilk ay = 100 baz)
+        cumulative_index = 100.0
+        all_data = []
+        for row in rows:
+            month_str = row["month_str"]
+            year, month_num = month_str.split("-")
+            month_label = f"{tr_months.get(month_num, month_num)} {year}"
+            avg_rate = float(row["avg_rate"])
+            cumulative_index = round(cumulative_index * (1 + avg_rate / 100), 2)
+
+            all_data.append({
+                "monthYear": month_label,
+                "monthStr": month_str,
+                "avgRate": avg_rate,
+                "minRate": float(row["min_rate"]),
+                "maxRate": float(row["max_rate"]),
+                "categoryCount": int(row["category_count"]),
+                "cumulativeIndex": cumulative_index,
+                "breakdown": row["breakdown"] or []
+            })
+
+        # Gösterilecek veriyi kırp (referans ayı hariç)
+        monthly_data = all_data[-display_limit:] if display_limit < 9999 else all_data
+
+        # Re-base cumulative index for display window
+        if monthly_data:
+            base_idx = monthly_data[0]["cumulativeIndex"] / (1 + monthly_data[0]["avgRate"] / 100)
+            for d in monthly_data:
+                d["cumulativeIndex"] = round(d["cumulativeIndex"] / base_idx * 100, 2)
+
+        # Özet istatistikler
+        rates = [d["avgRate"] for d in monthly_data]
+        current_rate = rates[-1] if rates else 0.0
+        recent = rates[-3:] if len(rates) >= 3 else rates
+        avg_3m = round(sum(recent) / len(recent), 2) if recent else 0.0
+        cum_total = round(monthly_data[-1]["cumulativeIndex"] - 100, 2) if monthly_data else 0.0
+        cat_count = monthly_data[-1]["categoryCount"] if monthly_data else 0
+
+        stats = {
+            "currentRate": current_rate,
+            "avg3Month": avg_3m,
+            "cumulativeTotal": cum_total,
+            "categoryCount": cat_count
+        }
+
+        return {"monthlyData": monthly_data, "stats": stats}
+
+    except Exception as e:
+        print(f"Overall inflation hatası: {e}")
+        return {"monthlyData": [], "stats": {}}
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

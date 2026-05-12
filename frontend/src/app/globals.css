@@ -1,34 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #fdfdfd;
+  --background: #fafafa;
   --foreground: #09090b;
-  --card-bg: rgba(255, 255, 255, 0.8);
-  --card-border: rgba(9, 9, 11, 0.08);
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(9, 9, 11, 0.07);
   --text-primary: #09090b;
   --text-secondary: #71717a;
-  --accent-glow: rgba(79, 70, 229, 0.1);
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --accent-soft: rgba(99, 102, 241, 0.08);
   color-scheme: light;
 }
 
 .dark {
   --background: #09090b;
-  --foreground: #ffffff;
-  --card-bg: rgba(24, 24, 27, 0.4);
-  --card-border: rgba(255, 255, 255, 0.05);
-  --text-primary: #ffffff;
+  --foreground: #fafafa;
+  --card-bg: rgba(18, 18, 20, 0.6);
+  --card-border: rgba(255, 255, 255, 0.06);
+  --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
-  --accent-glow: rgba(79, 70, 229, 0.15);
+  --accent: #818cf8;
+  --accent-glow: rgba(129, 140, 248, 0.2);
+  --accent-soft: rgba(99, 102, 241, 0.12);
   color-scheme: dark;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--background);
   color: var(--foreground);
   transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.25);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* ── Custom Keyframe Animations ── */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+  50%       { box-shadow: 0 0 20px 4px rgba(99, 102, 241, 0.25); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-spin-slow    { animation: spin-slow 3s linear infinite; }
+.animate-float        { animation: float 3s ease-in-out infinite; }
+.animate-shimmer      { animation: shimmer 2.5s linear infinite; }
+.animate-pulse-glow   { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-fade-up      { animation: fade-up 0.6s ease both; }
+.animate-count-up     { animation: count-up 0.5s ease both; }
+
+/* ── Shimmer text ── */
+.shimmer-text {
+  background: linear-gradient(90deg, currentColor 25%, rgba(255,255,255,0.7) 50%, currentColor 75%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 2.5s linear infinite;
+}
+
+/* ── Glass card ── */
+.glass-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Gradient border ── */
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.4), rgba(168,85,247,0.2), transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 @layer base {

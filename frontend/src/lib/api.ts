@@ -15,14 +15,11 @@ export const fetchCategories = async (): Promise<string[]> => {
 export const fetchInflationData = async (category: string, timeRange: string) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/inflation-data`, {
-      params: { 
-        category, 
-        time_range: timeRange
-      }
+      params: { category, time_range: timeRange }
     });
     return response.data;
   } catch (error) {
-    console.error(`Error fetching inflation data for ${category} with range ${timeRange}:`, error);
+    console.error(`Error fetching inflation data for ${category}:`, error);
     return { chartData: [], tableData: [], stats: null };
   }
 };
@@ -36,5 +33,17 @@ export const fetchComparison = async (category: string) => {
   } catch (error) {
     console.error(`Error fetching comparison for ${category}:`, error);
     return [];
+  }
+};
+
+export const fetchOverallInflation = async (timeRange: string = 'all') => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/overall-inflation`, {
+      params: { time_range: timeRange }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching overall inflation:', error);
+    return { monthlyData: [], stats: {} };
   }
 };
