@@ -1,0 +1,14 @@
+962cfcd feat: Add `deploy.sh` script to automate application deployment, including Docker and Docker Compose installation.
+33eec54 feat: Implement frontend API client and update backend CORS policy to include the frontend deployment URL.
+80d0348 feat: Add API utility for fetching inflation categories, data, and comparisons.
+ad79156 feat: Implement API client and configure Docker Compose for external API endpoint and expose frontend on port 80.
+0841480 feat: Implement initial Dockerized setup for the inflation dashboard, including a backend API with custom category logic and a frontend price chart component.
+bc394b6 feat: Implement initial Inflation Dashboard with data fetching, price trend charting, and UI components.
+3ebd7b7 Added and updated SQL queries for category data filtering.
+7ccfbbc Added and updated SQL queries for category data filtering
+3cf04c8 dashboard components updated
+253485e implement '1 Pirinc(1 kilo)' custom category and standardize exclusion logic
+337e954 feat: implement '1 Pirinc(1 kilo)' custom category and standardize exclusion logic
+b6e1ee9 Implement core backend API for inflation data with PostgreSQL integration and a frontend chart component.
+d69105d security: remove .env and update gitignore
+ef0d9f3 v1

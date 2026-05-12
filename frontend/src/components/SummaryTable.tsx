@@ -34,7 +34,7 @@ export default function SummaryTable({ data, stats }: SummaryTableProps) {
 
         <div className="space-y-5 relative z-10">
           <div>
-            <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-[0.2em] mb-1">Mevcut Fiyat</p>
+            <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-[0.2em] mb-1">Ortalama Fiyat</p>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-black text-zinc-900 dark:text-white">₺{stats?.latestPrice.toFixed(2) || '-'}</span>
               <span className="text-xs font-bold text-zinc-400 dark:text-zinc-600">/ Paket</span>
@@ -92,8 +92,8 @@ export default function SummaryTable({ data, stats }: SummaryTableProps) {
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-center gap-1.5">
                       <span className={`text-[11px] font-black px-2 py-0.5 rounded-md ${row.increasePct > 0 ? 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400'
-                          : row.increasePct < 0 ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 dark:text-zinc-500'
+                        : row.increasePct < 0 ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 dark:text-zinc-500'
                         }`}>
                         {row.increasePct > 0 ? '+' : ''}{row.increasePct.toFixed(1)}%
                       </span>
